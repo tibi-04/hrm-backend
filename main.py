@@ -21,6 +21,38 @@ from routers import (
     permission_requests
 )
 
+import bz2
+import requests
+
+MODEL_DIR = "models"
+MODEL_FILE = os.path.join(MODEL_DIR, "shape_predictor_68_face_landmarks.dat")
+MODEL_URL = "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
+
+
+def download_dlib_model():
+    """Tải model dlib nếu chưa có"""
+    if not os.path.exists(MODEL_FILE):
+        os.makedirs(MODEL_DIR, exist_ok=True)
+        compressed_path = MODEL_FILE + ".bz2"
+        print("Downloading dlib model... This may take a few minutes.")
+
+        # Tải file .bz2
+        with requests.get(MODEL_URL, stream=True) as r:
+            r.raise_for_status()
+            with open(compressed_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        print("Extracting model...")
+        # Giải nén .bz2 -> .dat
+        with bz2.BZ2File(compressed_path) as fr, open(MODEL_FILE, "wb") as fw:
+            fw.write(fr.read())
+
+        os.remove(compressed_path)
+        print("Model downloaded and extracted!")
+    else:
+        print("Model already exists, skip download.")
+
 
 load_dotenv()
 
@@ -117,9 +149,10 @@ def init_admin_user():
 @app.on_event("startup")
 async def on_startup():
     try:
+        download_dlib_model()   # tải model nếu chưa có
         init_admin_user()
-    except Exception:
-        pass  
+    except Exception as e:
+        print("Startup error:", e)
 
 
 api_routers = [
